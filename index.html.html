@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>Bauproben – Tour (Satellit, Wetter live)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+<style>
+* { box-sizing:border-box; }
+
+body {
+    margin:0;
+    font-family:"Segoe UI", Arial, sans-serif;
+    background:#f3f4f6;
+    color:#111827;
+}
+
+h1 {
+    padding:16px 20px 8px;
+    margin:0;
+    font-size:24px;
+    font-weight:600;
+    color:#111827;
+}
+
+/* Top-Bar */
+#topBar {
+    display:flex;
+    align-items:center;
+    gap:12px;
+    padding:8px 20px 14px;
+}
+
+/* Suchleiste links */
+#searchWrapper {
+    width:220px;
+    position:relative;
+    order:-1;
+}
+
+#searchBox {
+    width:100%;
+    padding:8px 30px 8px 30px;
+    font-size:13px;
+    border-radius:999px;
+    border:1px solid #d1d5db;
+    background:white;
+    color:#111827;
+    box-shadow:0 2px 8px rgba(0,0,0,0.08);
+    outline:none;
+}
+
+#searchBox::placeholder {
+    color:#9ca3af;
+}
+
+#searchWrapper::before {
+    content:"🔍";
+    position:absolute;
+    left:10px;
+    top:50%;
+    transform:translateY(-50%);
+    font-size:13px;
+    opacity:0.7;
+}
+
+#searchResults {
+    display:none;
+    background:white;
+    border:1px solid #d1d5db;
+    border-radius:12px;
+    padding:6px;
+    box-shadow:0 4px 16px rgba(0,0,0,0.12);
+    position:absolute;
+    top:40px;
+    left:0;
+    width:100%;
+    z-index:9999;
+    font-size:13px;
+    max-height:260px;
+    overflow-y:auto;
+}
+
+/* Day buttons */
+#dayBar {
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+}
+
+.dayButton {
+    padding:8px 14px;
+    border-radius:999px;
+    font-weight:600;
+    color:white;
+    cursor:pointer;
+    border:none;
+    font-size:13px;
+    box-shadow:0 2px 8px rgba(0,0,0,0.12);
+    transition:transform 0.12s ease, box-shadow 0.12s ease, opacity 0.12s ease;
+}
+
+.dayButton:hover {
+    transform:translateY(-1px);
+    box-shadow:0 4px 12px rgba(0,0,0,0.16);
+    opacity:0.95;
+}
+
+.dayButton[data-day="montag"] { background:#22c55e; }
+.dayButton[data-day="dienstag"] { background:#f97316; }
+.dayButton[data-day="mittwoch"] { background:#eab308; }
+.dayButton[data-day="donnerstag"] { background:#38bdf8; }
+.dayButton[data-day="freitag"] { background:#ef4444; }
+.dayButton[data-day="endstrassen"] { background:#a855f7; }
+.dayButton[data-day="alle"] { background:#4b5563; }
+
+.dayButton.active {
+    outline:3px solid #111827;
+}
+
+/* Map */
+#map {
+    height:60vh;
+    width:100%;
+    border-radius:16px;
+    margin:0 20px 18px;
+    box-shadow:0 4px 18px rgba(0,0,0,0.18);
+    border:1px solid #d1d5db;
+    position:relative;
+}
+
+/* Wetter-Steuerung */
+#weatherControls {
+    position:absolute;
+    top:20px;
+    right:30px;
+    z-index:9999;
+    padding:8px 12px;
+    background:rgba(255,255,255,0.35);
+    backdrop-filter:blur(8px);
+    border-radius:12px;
+    border:1px solid rgba(255,255,255,0.4);
+    font-size:12px;
+    color:#111827;
+    display:flex;
+    gap:8px;
+    align-items:center;
+}
+
+.weatherBtn {
+    padding:6px 10px;
+    border-radius:8px;
+    background:rgba(255,255,255,0.5);
+    border:1px solid rgba(0,0,0,0.1);
+    cursor:pointer;
+    font-size:12px;
+    transition:0.15s;
+}
+
+.weatherBtn:hover {
+    background:rgba(255,255,255,0.8);
+}
+
+/* Content area */
+#contentArea {
+    display:flex;
+    padding:0 20px 20px;
+    gap:16px;
+    flex-wrap:wrap;
+}
+
+/* Panels */
+#tableArea, #sideArea {
+    background:white;
+    border-radius:16px;
+    box-shadow:0 4px 18px rgba(0,0,0,0.12);
+    border:1px solid #e5e7eb;
+}
+
+#tableArea {
+    flex:1;
+    min-width:420px;
+    padding:14px 16px 16px;
+}
+
+#sideArea {
+    width:380px;
+    min-width:320px;
+    padding:14px 16px 16px;
+}
+
+/* Panel headings */
+#tableArea h3, #sideArea h3 {
+    margin:0 0 10px;
+    font-size:15px;
+    font-weight:600;
+    color:#111827;
+}
+
+/* Table */
+table {
+    width:100%;
+    border-collapse:collapse;
+    font-size:12px;
+    color:#111827;
+}
+
+th, td {
+    padding:5px 6px;
+    border-bottom:1px solid #e5e7eb;
+}
+
+th {
+    background:#f3f4f6;
+    position:sticky;
+    top:0;
+    z-index:1;
+}
+
+/* Total row */
+tfoot th {
+    background:#f3f4f6;
+    border-top:1px solid #e5e7eb;
+}
+
+/* QR */
+#qrImage {
+    width:100%;
+    max-width:320px;
+    height:auto;
+    border:1px solid #e5e7eb;
+    padding:10px;
+    background:white;
+    border-radius:14px;
+    box-shadow:0 4px 16px rgba(0,0,0,0.12);
+}
+
+/* Legend */
+#legend {
+    margin-top:14px;
+    display:none;
+}
+
+.legendItem {
+    margin-bottom:6px;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    gap:6px;
+    font-size:13px;
+    color:#111827;
+    transition:opacity 0.12s ease, transform 0.12s ease;
+    opacity:0.5;
+}
+
+.legendItem:hover {
+    transform:translateX(2px);
+    opacity:0.9;
+}
+
+.legendItem.active {
+    opacity:1;
+}
+
+.colorBox {
+    width:16px;
+    height:16px;
+    border-radius:999px;
+    border:1px solid #9ca3af;
+}
+
+/* Search results items */
+#searchResults div {
+    padding:6px 8px;
+    border-radius:10px;
+    margin-bottom:4px;
+    background:#f9fafb;
+    border:1px solid #e5e7eb;
+    color:#111827;
+    cursor:pointer;
+    transition:background 0.12s ease, transform 0.12s ease;
+}
+
+#searchResults div:hover {
+    background:#e5e7eb;
+    transform:translateY(-1px);
+}
+
+/* Leaflet popup hell */
+.leaflet-popup-content-wrapper {
+    background:white;
+    border-radius:10px;
+    border:1px solid #e5e7eb;
+}
+
+.leaflet-popup-content {
+    margin:10px;
+    font-size:13px;
+    color:#111827;
+}
+
+/* Mobile */
+@media (max-width:768px) {
+    #topBar {
+        flex-direction:column;
+        align-items:flex-start;
+    }
+    #map {
+        height:50vh;
+        margin:0 12px 12px;
+    }
+    #contentArea {
+        padding:0 12px 16px;
+        flex-direction:column;
+    }
+    #tableArea, #sideArea {
+        width:100%;
+        min-width:0;
+    }
+}
+</style>
+</head>
+<body>
+
+<h1>Bauproben – Tour (Satellit, live Wetter)</h1>
+
+<div id="topBar">
+    <div id="searchWrapper">
+        <input id="searchBox" type="text" placeholder="Suche…">
+        <div id="searchResults"></div>
+    </div>
+
+    <div id="dayBar">
+        <button class="dayButton" data-day="montag">Montag</button>
+        <button class="dayButton" data-day="dienstag">Dienstag</button>
+        <button class="dayButton" data-day="mittwoch">Mittwoch</button>
+        <button class="dayButton" data-day="donnerstag">Donnerstag</button>
+        <button class="dayButton" data-day="freitag">Freitag</button>
+        <button class="dayButton" data-day="endstrassen">Endstraßen</button>
+        <button class="dayButton" data-day="alle">Alle</button>
+    </div>
+</div>
+
+<div id="map">
+    <div id="weatherControls">
+        <div class="weatherBtn" id="weatherPlay">▶</div>
+        <div class="weatherBtn" id="weatherPrev">⟵</div>
+        <div class="weatherBtn" id="weatherNext">⟶</div>
+    </div>
+</div>
+
+<div id="contentArea">
+    <div id="tableArea">
+        <h3>Reihenfolge & Distanz</h3>
+        <table id="distTable">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Tag</th>
+                    <th>Bau</th>
+                    <th>Betrieb</th>
+                    <th>Anlage</th>
+                    <th>Telefon</th>
+                    <th>Von</th>
+                    <th>Nach</th>
+                    <th>Distanz (m)</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+            <tfoot>
+                <tr>
+                    <th colspan="8">Gesamt</th>
+                    <th id="totalDist">0</th>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+    <div id="sideArea">
+        <div id="qrBox" style="display:none;">
+            <h3 id="qrTitle">Navigation</h3>
+            <img id="qrImage" src="">
+        </div>
+
+        <div id="legend">
+            <h3>Legende</h3>
+            <div class="legendItem" data-day="montag"><span class="colorBox" style="background:#22c55e;"></span> Montag</div>
+            <div class="legendItem" data-day="dienstag"><span class="colorBox" style="background:#f97316;"></span> Dienstag</div>
+            <div class="legendItem" data-day="mittwoch"><span class="colorBox" style="background:#eab308;"></span> Mittwoch</div>
+            <div class="legendItem" data-day="donnerstag"><span class="colorBox" style="background:#38bdf8;"></span> Donnerstag</div>
+            <div class="legendItem" data-day="freitag"><span class="colorBox" style="background:#ef4444;"></span> Freitag</div>
+            <div class="legendItem" data-day="endstrassen"><span class="colorBox" style="background:#a855f7;"></span> Endstraßen</div>
+        </div>
+    </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* ---------------------------------------------------------
+   Routen
+--------------------------------------------------------- */
+const routes = {
+    montag: [
+        { name:"Meldekopf", lat:51.691639, lon:7.099722, betrieb:"Evonik", anlage:"Meldekopf", tel:"" },
+        { name:"Bau 844", lat:51.689565, lon:7.095635, betrieb:"Vestolit GmbH", anlage:"Chlorverteilung u. Entquickung", tel:"" },
+        { name:"Bau 870", lat:51.688305, lon:7.093348, betrieb:"Vestolit GmbH", anlage:"Saline/Chlorverdichter", tel:"9549731" },
+        { name:"Bau 758", lat:51.687525, lon:7.094704, betrieb:"Vestolit GmbH", anlage:"VC II/III Bisulfit", tel:"9549425" },
+        { name:"Bau 752", lat:51.687619, lon:7.095118, betrieb:"Vestolit GmbH", anlage:"VC II/III Stripper", tel:"9549860" },
+        { name:"Bau 739", lat:51.687818, lon:7.097994, betrieb:"Vestolit GmbH", anlage:"HCL-Gewinnung", tel:"9549215" },
+        { name:"Bau 732", lat:51.688502, lon:7.098751, betrieb:"Sasol", anlage:"Sulfierfabrik Grube Süd", tel:"2703" },
+        { name:"Bau 735D", lat:51.688156, lon:7.099784, betrieb:"EPP", anlage:"DDS - Destillation", tel:"4011" },
+        { name:"Bau 723", lat:51.688546, lon:7.100272, betrieb:"Vestolit GmbH", anlage:"Ethyl-Methylchloridanlage", tel:"9549215" },
+        { name:"Bau 536", lat:51.687650, lon:7.102334, betrieb:"Sasol", anlage:"FA - Grube Aminfabrik", tel:"5606" },
+        { name:"Bau 506", lat:51.687293, lon:7.103598, betrieb:"Sarpi", anlage:"Sonderverbrennung", tel:"4674" },
+        { name:"Bau 517", lat:51.687002, lon:7.102808, betrieb:"NEW", anlage:"Biodieselanlage", tel:"86555" },
+        { name:"Bau 730", lat:51.689146, lon:7.098375, betrieb:"Evonik", anlage:"Schwefelsäure", tel:"5495" },
+        { name:"Bau 929", lat:51.690220, lon:7.098625, betrieb:"Vestolit GmbH", anlage:"Saline/Chlorverdichter", tel:"9549731" },
+    ],
+    dienstag: [
+        { name:"Meldekopf", lat:51.691639, lon:7.099722, betrieb:"Evonik", anlage:"Meldekopf", tel:"" },
+        { name:"Bau 119E", lat:51.682893, lon:7.104682, betrieb:"Sasol", anlage:"FA-Grube Glykolfabrik", tel:"5381" },
+        { name:"Bau 1020", lat:51.682751, lon:7.105278, betrieb:"Sasol", anlage:"THM Betrieb", tel:"5375" },
+        { name:"Bau 1019", lat:51.682223, lon:7.105664, betrieb:"Sasol", anlage:"FA Grube Alkylphenolfabrik", tel:"5775" },
+        { name:"Bau 1120", lat:51.681765, lon:7.106344, betrieb:"EOX", anlage:"Harzgrube", tel:"6931510" },
+        { name:"Bau 1214", lat:51.680663, lon:7.106554, betrieb:"Sasol", anlage:"FA - Grube EO-Fabrik", tel:"5520" },
+        { name:"Bau 1227", lat:51.680200, lon:7.105775, betrieb:"Evonik", anlage:"Anwendungstechnikum", tel:"" },
+        { name:"Bau 1129S", lat:51.680581, lon:7.105539, betrieb:"Vestolit GmbH", anlage:"Anwendungstechnikum", tel:"" },
+        { name:"Bau 1262", lat:51.679254, lon:7.098456, betrieb:"EVS", anlage:"Gebäude 1262 / 1266", tel:"4212" },
+        { name:"Bau 159", lat:51.681573, lon:7.098483, betrieb:"EIC", anlage:"Feinchemikalien - Betrieb", tel:"4538" },
+        { name:"Bau 152", lat:51.682171, lon:7.098488, betrieb:"EPP", anlage:"Technikum 152", tel:"6832" },
+        { name:"Bau 361", lat:51.682970, lon:7.094728, betrieb:"Sasol", anlage:"FA Grube HD - Hydrierung", tel:"6062" },
+        { name:"Bau 341", lat:51.683748, lon:7.099734, betrieb:"Sasol", anlage:"HDH - Destillation", tel:"6062" },
+        { name:"Bau 239", lat:51.683255, lon:7.100817, betrieb:"Evonik", anlage:"Kontaktfabrik", tel:"7901" },
+    ],
+    mittwoch: [
+        { name:"Meldekopf", lat:51.691639, lon:7.099722, betrieb:"Evonik", anlage:"Meldekopf", tel:"" },
+        { name:"798 R", lat:51.691412, lon:7.100479, betrieb:"OX", anlage:"Russwasser", tel:"" },
+        { name:"459", lat:51.684461, lon:7.097555, betrieb:"OX", anlage:"Weichmacherfabrik", tel:"4712" },
+        { name:"475", lat:51.683856, lon:7.094364, betrieb:"OX", anlage:"Carbonsäureanlage", tel:"6931511" },
+        { name:"384 B", lat:51.683025, lon:7.091409, betrieb:"EPP", anlage:"CDT", tel:"2334" },
+        { name:"577", lat:51.684272, lon:7.092682, betrieb:"EPP", anlage:"Vestamid", tel:"87702" },
+        { name:"584", lat:51.684848, lon:7.091545, betrieb:"EPP", anlage:"Kontipolanlage", tel:"19922" },
+        { name:"598", lat:51.684752, lon:7.088872, betrieb:"EPP", anlage:"KTK (N)", tel:"4660" },
+        { name:"692", lat:51.685302, lon:7.089391, betrieb:"OX", anlage:"Raffinat I/II - Tanklager", tel:"5570" },
+        { name:"580", lat:51.685500, lon:7.092263, betrieb:"EPP", anlage:"Laurinlactam", tel:"5156" },
+        { name:"562 A + B", lat:51.685879, lon:7.094680, betrieb:"Evonik", anlage:"Laurinlactam NEU", tel:"5290" },
+        { name:"560", lat:51.686587, lon:7.096066, betrieb:"ISP", anlage:"Acetylenanlage", tel:"9727" },
+        { name:"761", lat:51.686879, lon:7.094228, betrieb:"Evonik", anlage:"CDOM Anlage", tel:"2359" },
+        { name:"779", lat:51.686327, lon:7.091781, betrieb:"OX", anlage:"Raffinat I/II - Neuanlage", tel:"5570" },
+        { name:"783", lat:51.686229, lon:7.090142, betrieb:"OX", anlage:"Raffinat I/II - Anlage", tel:"5570" },
+        { name:"N 798", lat:51.686792, lon:7.088380, betrieb:"OX", anlage:"Synthesegas", tel:"86883" },
+        { name:"9516", lat:51.692205, lon:7.081790, betrieb:"Hilgenberg", anlage:"", tel:"" },
+    ],
+    donnerstag: [
+        { name:"Meldekopf", lat:51.691639, lon:7.099722, betrieb:"Evonik", anlage:"Meldekopf", tel:"" },
+        { name:"Bau 2820", lat:51.6866624, lon:7.0834256, betrieb:"Evonik", anlage:"KWDA", tel:"5484" },
+        { name:"Bau 2709", lat:51.6853376, lon:7.0873084, betrieb:"SDG", anlage:"NLP-Betrieb", tel:"4610" },
+        { name:"Bau 2620", lat:51.6848377, lon:7.0855701, betrieb:"SDG", anlage:"Bunatex", tel:"6574" },
+        { name:"Bau 2645", lat:51.6828303, lon:7.0798985, betrieb:"OX", anlage:"Butadienbetriebe", tel:"6297" },
+        { name:"Bau 2328", lat:51.680869, lon:7.083049, betrieb:"S.I.Q. Kunstharze", anlage:"Polyamino-Amid", tel:"19299" },
+        { name:"Bau 3250", lat:51.6755549, lon:7.0839201, betrieb:"ILS", anlage:"Hochregallager", tel:"4292" },
+        { name:"Bau 2215", lat:51.6801221, lon:7.0875003, betrieb:"Vestolit GmbH", anlage:"PVC-Abw. Reinigung", tel:"9549118" },
+        { name:"Bau 2222", lat:51.6806188, lon:7.0861953, betrieb:"EIC", anlage:"Zwischenprodukte", tel:"2412" },
+        { name:"Bau 2337", lat:51.6805144, lon:7.0852662, betrieb:"Sasol", anlage:"Marlipalfabrik", tel:"2637" },
+        { name:"Bau 2319", lat:51.6812015, lon:7.0869060, betrieb:"ECA", anlage:"Polyolefinanlage", tel:"2782" },
+        { name:"Bau 2302", lat:51.6818523, lon:7.0881460, betrieb:"OX", anlage:"Oxo-Anlage", tel:"6715" },
+        { name:"Bau 2304", lat:51.6818545, lon:7.0888627, betrieb:"OX", anlage:"2-PH-Anlage", tel:"6715" },
+        { name:"Bau 298", lat:51.6816582, lon:7.0901309, betrieb:"ECA", anlage:"Lackharzbetrieb", tel:"5460" },
+        { name:"Bau 282", lat:51.6817602, lon:7.0925133, betrieb:"Sasol", anlage:"Marlonfabrik", tel:"9071" },
+        { name:"Bau 181", lat:51.6801124, lon:7.0937287, betrieb:"Evonik", anlage:"Technikum", tel:"19436" },
+        { name:"Bau 1186", lat:51.6792387, lon:7.0946305, betrieb:"Evonik", anlage:"Ausbildung", tel:"" },
+    ],
+    freitag: [
+        { name:"Meldekopf", lat:51.691639, lon:7.099722, betrieb:"Evonik", anlage:"Meldekopf", tel:"" },
+        { name:"Bau 9128", lat:51.6922152, lon:7.0998117, betrieb:"Evonik", anlage:"Hafenbetriebe", tel:"5340" },
+        { name:"Bau 9097", lat:51.689601, lon:7.089755, betrieb:"Evonik", anlage:"Fenton-Anlage", tel:"" },
+        { name:"Bau 985", lat:51.6878684, lon:7.0879964, betrieb:"AMG", anlage:"Acrylsäureanlage", tel:"6586" },
+        { name:"Bau 988", lat:51.6881224, lon:7.0875200, betrieb:"AMG", anlage:"Acrylsäureanlage", tel:"6586" },
+        { name:"Bau 981", lat:51.6882340, lon:7.0873860, betrieb:"AMG", anlage:"Acrylsäureanlage", tel:"6586" },
+        { name:"Bau 9079", lat:51.6903060, lon:7.0851390, betrieb:"Evonik", anlage:"Fenton-Anlage", tel:"" },
+        { name:"Bau 9196", lat:51.690332, lon:7.085957, betrieb:"ECA", anlage:"Buna-CB-Anlage", tel:"" },
+        { name:"Bau 1818", lat:51.6974719, lon:7.0944063, betrieb:"Evonik", anlage:"Brauchwasseraufbereitung", tel:"2820" },
+        { name:"Bau 1992", lat:51.6918125, lon:7.0850467, betrieb:"INEOS", anlage:"Entsalzungsbehälter zur Fenton-Anlage", tel:"" },
+        { name:"Bau 9708", lat:51.6915906, lon:7.0832055, betrieb:"ISP", anlage:"Butandiol-Anlage", tel:"2919" },
+        { name:"Bau 9605", lat:51.6910264, lon:7.0819588, betrieb:"Evonik", anlage:"KSV-Waschwasser", tel:"5741" },
+    ],
+    endstrassen: [
+        { name:"Meldekopf", lat:51.691639, lon:7.099722, betrieb:"Evonik", anlage:"Meldekopf", tel:"" },
+        { name:"Garage 900/20", lat:51.690515, lon:7.099929, betrieb:"", anlage:"", tel:"" },
+        { name:"Garage 900/40 Mitte/Ost", lat:51.689777, lon:7.096563, betrieb:"", anlage:"", tel:"" },
+        { name:"Garage 900/60", lat:51.688666, lon:7.093433, betrieb:"", anlage:"", tel:"" },
+        { name:"Garage 900/80", lat:51.688960, lon:7.092507, betrieb:"", anlage:"", tel:"" },
+        { name:"Garage 900/2000 Nord", lat:51.687654, lon:7.086138, betrieb:"", anlage:"", tel:"" },
+        { name:"Garage 900/2000 Süd", lat:51.687066, lon:7.086738, betrieb:"", anlage:"", tel:"" }
+    ]
+};
+
+/* ---------------------------------------------------------
+   Farben
+--------------------------------------------------------- */
+const dayColors = {
+    montag:"#22c55e",
+    dienstag:"#f97316",
+    mittwoch:"#eab308",
+    donnerstag:"#38bdf8",
+    freitag:"#ef4444",
+    endstrassen:"#a855f7"
+};
+
+/* ---------------------------------------------------------
+   Karte (ESRI Satellit)
+--------------------------------------------------------- */
+const map = L.map("map").setView([51.691639, 7.099722], 14);
+
+L.tileLayer(
+    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    {
+        maxZoom: 19,
+        attribution: "Tiles © Esri"
+    }
+).addTo(map);
+
+let routeLayer = L.layerGroup().addTo(map);
+let searchLayer = L.layerGroup().addTo(map);
+let activeDays = new Set();
+
+/* ---------------------------------------------------------
+   Marker (SVG)
+--------------------------------------------------------- */
+function createMarkerIcon(day) {
+    const color = dayColors[day];
+    return L.divIcon({
+        className: "",
+        html: `
+        <svg width="34" height="34" viewBox="0 0 34 34"
+             xmlns="http://www.w3.org/2000/svg">
+            <path d="M17 3 C11 3 6 8 6 14 C6 21 17 32 17 32 C17 32 28 21 28 14 C28 8 23 3 17 3 Z"
+                  fill="${color}" stroke="white" stroke-width="2"/>
+            <circle cx="17" cy="14" r="4.5" fill="white"/>
+        </svg>
+        `,
+        iconSize: [34,34],
+        iconAnchor: [17,34]
+    });
+}
+
+/* ---------------------------------------------------------
+   Popup mit QR für Navigation vom Meldekopf
+--------------------------------------------------------- */
+const meldekopf = { lat:51.691639, lon:7.099722 };
+
+function popupHTML(p, day) {
+    const navUrl =
+        "https://www.google.com/maps/dir/?api=1"
+        + "&travelmode=driving"
+        + `&origin=${meldekopf.lat},${meldekopf.lon}`
+        + `&destination=${p.lat},${p.lon}`;
+
+    const qrUrl =
+        "https://api.qrserver.com/v1/create-qr-code/?size=160x160&data="
+        + encodeURIComponent(navUrl);
+
+    return `
+        <div style="
+            padding:10px;
+            border-left:6px solid ${dayColors[day]};
+            background:white;
+            color:#111827;
+            font-size:13px;
+        ">
+            <b>${p.name}</b><br>
+            <span style="color:#4b5563;">${p.betrieb}</span><br>
+            <span style="color:#6b7280;">${p.anlage}</span><br>
+            <span style="color:#9ca3af;">Tel: ${p.tel || "-"}</span>
+
+            <div style="margin-top:10px; text-align:center;">
+                <img src="${qrUrl}"
+                     alt="QR Navigation"
+                     style="width:120px; height:120px; border-radius:8px; border:1px solid #e5e7eb; padding:4px; background:white;">
+                <div style="font-size:11px; color:#6b7280; margin-top:4px;">
+                    Navigation vom Meldekopf
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+/* ---------------------------------------------------------
+   Distanz
+--------------------------------------------------------- */
+function dist(a, b) {
+    const R = 6371000;
+    const toRad = d => d * Math.PI / 180;
+    const dLat = toRad(b.lat - a.lat);
+    const dLon = toRad(b.lon - a.lon);
+    const lat1 = toRad(a.lat);
+    const lat2 = toRad(b.lat);
+
+    const h = Math.sin(dLat/2)**2 +
+              Math.cos(lat1)*Math.cos(lat2) *
+              Math.sin(dLon/2)**2;
+
+    return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1-h));
+}
+
+/* ---------------------------------------------------------
+   QR für komplette Tagesroute
+--------------------------------------------------------- */
+function generateQR(day) {
+    const pts = routes[day];
+    if (!pts || pts.length < 2) return;
+
+    const origin = `${meldekopf.lat},${meldekopf.lon}`;
+    const destination = `${pts[pts.length - 1].lat},${pts[pts.length - 1].lon}`;
+
+    const waypoints = pts
+        .slice(1, pts.length - 1)
+        .map(p => `${p.lat},${p.lon}`)
+        .join("|");
+
+    let url = "https://www.google.com/maps/dir/?api=1"
+            + "&travelmode=driving"
+            + `&origin=${origin}`
+            + `&destination=${destination}`;
+
+    if (waypoints.length > 0) {
+        url += `&waypoints=${waypoints}`;
+    }
+
+    document.getElementById("qrImage").src =
+        "https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=" +
+        encodeURIComponent(url);
+
+    document.getElementById("qrTitle").textContent =
+        "Navigation – " + day.toUpperCase();
+    document.getElementById("qrBox").style.display = "block";
+}
+
+/* ---------------------------------------------------------
+   Tabelle
+--------------------------------------------------------- */
+function hexToRgba(hex, alpha) {
+    hex = hex.replace("#","");
+    const r = parseInt(hex.substring(0,2),16);
+    const g = parseInt(hex.substring(2,4),16);
+    const b = parseInt(hex.substring(4,6),16);
+    return `rgba(${r},${g},${b},${alpha})`;
+}
+
+function updateTable(day) {
+    const tbody = document.querySelector("#distTable tbody");
+    tbody.innerHTML = "";
+    let totalDist = 0;
+
+    const pts = routes[day];
+    if (!pts || pts.length < 2) {
+        document.getElementById("totalDist").textContent = "0";
+        return;
+    }
+
+    const color = dayColors[day];
+    const bg = hexToRgba(color, 0.12);
+
+    for (let i = 0; i < pts.length - 1; i++) {
+        const a = pts[i];
+        const b = pts[i+1];
+        const d = dist(a, b);
+
+        totalDist += d;
+
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+            <td>${i+1}</td>
+            <td>${day.toUpperCase()}</td>
+            <td>${b.name}</td>
+            <td>${b.betrieb}</td>
+            <td>${b.anlage}</td>
+            <td>${b.tel || "-"}</td>
+            <td>${a.name}</td>
+            <td>${b.name}</td>
+            <td>${Math.round(d)}</td>
+        `;
+        tr.style.backgroundColor = bg;
+        tr.style.borderLeft = `3px solid ${color}`;
+        tbody.appendChild(tr);
+    }
+
+    document.getElementById("totalDist").textContent = Math.round(totalDist);
+}
+
+function updateTableAll() {
+    const tbody = document.querySelector("#distTable tbody");
+    tbody.innerHTML = "";
+    let total = 0;
+
+    activeDays.forEach(day => {
+        const pts = routes[day];
+        if (!pts || pts.length < 2) return;
+
+        const color = dayColors[day];
+        const bg = hexToRgba(color, 0.12);
+
+        for (let i = 0; i < pts.length - 1; i++) {
+            const a = pts[i];
+            const b = pts[i+1];
+            const d = dist(a, b);
+            total += d;
+
+            const tr = document.createElement("tr");
+            tr.innerHTML = `
+                <td>${i+1}</td>
+                <td>${day.toUpperCase()}</td>
+                <td>${b.name}</td>
+                <td>${b.betrieb}</td>
+                <td>${b.anlage}</td>
+                <td>${b.tel || "-"}</td>
+                <td>${a.name}</td>
+                <td>${b.name}</td>
+                <td>${Math.round(d)}</td>
+            `;
+            tr.style.backgroundColor = bg;
+            tr.style.borderLeft = `3px solid ${color}`;
+            tbody.appendChild(tr);
+        }
+    });
+
+    document.getElementById("totalDist").textContent = Math.round(total);
+}
+
+/* ---------------------------------------------------------
+   Linien zeichnen
+--------------------------------------------------------- */
+function drawDay(day) {
+    routeLayer.clearLayers();
+    searchLayer.clearLayers();
+
+    if (day === "alle") {
+        activeDays.clear();
+        ["montag","dienstag","mittwoch","donnerstag","freitag","endstrassen"]
+            .forEach(d => activeDays.add(d));
+        document.getElementById("legend").style.display = "block";
+        document.querySelectorAll(".legendItem").forEach(li => {
+            li.classList.add("active");
+        });
+        document.getElementById("qrBox").style.display = "none";
+        drawAllSelectedDays();
+        return;
+    }
+
+    document.getElementById("legend").style.display = "none";
+
+    const pts = routes[day];
+    if (!pts || pts.length === 0) return;
+
+    pts.forEach(p => {
+        L.marker([p.lat, p.lon], { icon:createMarkerIcon(day) })
+            .addTo(routeLayer)
+            .bindPopup(popupHTML(p, day));
+    });
+
+    const latlngs = pts.map(p => [p.lat, p.lon]);
+
+    L.polyline(latlngs, {
+        color: dayColors[day],
+        weight: 4,
+        opacity: 0.95,
+        renderer: L.canvas(),
+        interactive: false
+    }).addTo(routeLayer);
+
+    L.polyline(latlngs, {
+        color: dayColors[day],
+        weight: 10,
+        opacity: 0.25,
+        renderer: L.canvas(),
+        interactive: false
+    }).addTo(routeLayer);
+
+    map.fitBounds(latlngs, { padding:[40,40] });
+
+    updateTable(day);
+    generateQR(day);
+}
+
+/* ---------------------------------------------------------
+   Multi-Tag
+--------------------------------------------------------- */
+function drawAllSelectedDays() {
+    routeLayer.clearLayers();
+    searchLayer.clearLayers();
+
+    activeDays.forEach(day => {
+        const pts = routes[day];
+        if (!pts || pts.length === 0) return;
+
+        pts.forEach(p => {
+            L.marker([p.lat, p.lon], { icon:createMarkerIcon(day) })
+                .addTo(routeLayer)
+                .bindPopup(popupHTML(p, day));
+        });
+
+        const latlngs = pts.map(p => [p.lat, p.lon]);
+
+        L.polyline(latlngs, {
+            color: dayColors[day],
+            weight: 3,
+            dashArray: "6 6",
+            opacity: 0.95,
+            renderer: L.canvas(),
+            interactive: false
+        }).addTo(routeLayer);
+
+        L.polyline(latlngs, {
+            color: dayColors[day],
+            weight: 8,
+            opacity: 0.25,
+            renderer: L.canvas(),
+            interactive: false
+        }).addTo(routeLayer);
+    });
+
+    const allPoints = [...activeDays]
+        .flatMap(day => routes[day] || [])
+        .map(p => [p.lat, p.lon]);
+
+    if (allPoints.length > 0) {
+        map.fitBounds(allPoints, { padding:[40,40] });
+    }
+
+    updateTableAll();
+}
+
+/* ---------------------------------------------------------
+   Buttons
+--------------------------------------------------------- */
+document.querySelectorAll(".dayButton").forEach(btn => {
+    btn.addEventListener("click", () => {
+        document.querySelectorAll(".dayButton").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        drawDay(btn.dataset.day);
+    });
+});
+
+/* ---------------------------------------------------------
+   Legende
+--------------------------------------------------------- */
+document.querySelectorAll(".legendItem").forEach(item => {
+    item.addEventListener("click", () => {
+        const day = item.dataset.day;
+        if (activeDays.has(day)) {
+            activeDays.delete(day);
+            item.classList.remove("active");
+        } else {
+            activeDays.add(day);
+            item.classList.add("active");
+        }
+        drawAllSelectedDays();
+    });
+});
+
+/* ---------------------------------------------------------
+   Suche
+--------------------------------------------------------- */
+const searchBox = document.getElementById("searchBox");
+const searchResults = document.getElementById("searchResults");
+
+searchBox.addEventListener("input", function () {
+    const q = this.value.toLowerCase().trim();
+
+    searchResults.innerHTML = "";
+    searchResults.style.display = "none";
+    searchLayer.clearLayers();
+
+    if (q.length < 2) {
+        const activeBtn = document.querySelector(".dayButton.active");
+        const day = activeBtn ? activeBtn.dataset.day : "montag";
+        if (day === "alle") drawAllSelectedDays();
+        else drawDay(day);
+        return;
+    }
+
+    let results = [];
+
+    Object.entries(routes).forEach(([tag, pts]) => {
+        pts.forEach(p => {
+            const text = `${p.name} ${p.anlage} ${p.betrieb} ${p.tel}`.toLowerCase();
+            if (text.includes(q)) results.push({ ...p, tag });
+        });
+    });
+
+    if (results.length === 0) return;
+
+    searchLayer.clearLayers();
+
+    results.forEach(p => {
+        const m = L.marker([p.lat, p.lon], { icon:createMarkerIcon(p.tag) }).addTo(searchLayer);
+        m.bindPopup(popupHTML(p, p.tag));
+    });
+
+    map.fitBounds(results.map(p => [p.lat, p.lon]), { padding:[40,40] });
+
+    results.forEach(p => {
+        const div = document.createElement("div");
+        div.textContent = `${p.tag.toUpperCase()} – ${p.name} – ${p.anlage} (${p.betrieb})`;
+        div.addEventListener("click", () => {
+            map.setView([p.lat, p.lon], 18);
+
+            searchLayer.eachLayer(marker => {
+                const pos = marker.getLatLng();
+                if (pos.lat === p.lat && pos.lng === p.lon) marker.openPopup();
+            });
+
+            searchResults.style.display = "none";
+        });
+
+        searchResults.appendChild(div);
+    });
+
+    searchResults.style.display = "block";
+});
+
+/* ---------------------------------------------------------
+   RainViewer – animiertes Wetter Overlay
+--------------------------------------------------------- */
+let rainviewerFrames = [];
+let rainviewerIndex = 0;
+let rainviewerLayer = null;
+let rainviewerTimer = null;
+
+function loadRainViewer() {
+    fetch("https://api.rainviewer.com/public/weather-maps.json")
+        .then(r => r.json())
+        .then(data => {
+            rainviewerFrames = data.radar.past.concat(data.radar.nowcast);
+            rainviewerIndex = rainviewerFrames.length - 1;
+            showRainViewerFrame(rainviewerIndex);
+        });
+}
+
+function showRainViewerFrame(i) {
+    const frame = rainviewerFrames[i];
+    if (!frame) return;
+
+    const url = frame.path;
+
+    if (rainviewerLayer) {
+        map.removeLayer(rainviewerLayer);
+    }
+
+    rainviewerLayer = L.tileLayer(
+        `https://tilecache.rainviewer.com${url}/256/{z}/{x}/{y}/2/1_1.png`,
+        {
+            opacity: 0.35,
+            zIndex: 500
+        }
+    );
+
+    rainviewerLayer.addTo(map);
+}
+
+function playRainViewer() {
+    if (rainviewerTimer) return;
+
+    rainviewerTimer = setInterval(() => {
+        rainviewerIndex++;
+        if (rainviewerIndex >= rainviewerFrames.length) {
+            rainviewerIndex = 0;
+        }
+        showRainViewerFrame(rainviewerIndex);
+    }, 800);
+}
+
+function stopRainViewer() {
+    clearInterval(rainviewerTimer);
+    rainviewerTimer = null;
+}
+
+/* ---------------------------------------------------------
+   Wetter-Buttons
+--------------------------------------------------------- */
+document.getElementById("weatherPlay").onclick = () => {
+    if (rainviewerTimer) {
+        stopRainViewer();
+        document.getElementById("weatherPlay").textContent = "▶";
+    } else {
+        playRainViewer();
+        document.getElementById("weatherPlay").textContent = "⏸";
+    }
+};
+
+document.getElementById("weatherPrev").onclick = () => {
+    stopRainViewer();
+    rainviewerIndex--;
+    if (rainviewerIndex < 0) rainviewerIndex = rainviewerFrames.length - 1;
+    showRainViewerFrame(rainviewerIndex);
+};
+
+document.getElementById("weatherNext").onclick = () => {
+    stopRainViewer();
+    rainviewerIndex++;
+    if (rainviewerIndex >= rainviewerFrames.length) rainviewerIndex = 0;
+    showRainViewerFrame(rainviewerIndex);
+};
+
+/* ---------------------------------------------------------
+   Start
+--------------------------------------------------------- */
+document.querySelector('.dayButton[data-day="montag"]').classList.add("active");
+drawDay("montag");
+loadRainViewer();
+</script>
+</body>
+</html>
