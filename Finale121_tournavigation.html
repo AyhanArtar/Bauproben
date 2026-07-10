@@ -594,37 +594,20 @@ function dist(a, b) {
 const meldekopf = { lat:51.691639, lon:7.099722 };
 
 function generateQR(day) {
-    const pts = routes[day];
-    if (!pts || pts.length < 2) return;
 
-    const origin = `${meldekopf.lat},${meldekopf.lon}`;
-    const destination = `${pts[pts.length - 1].lat},${pts[pts.length - 1].lon}`;
-
-    const waypoints = pts
-        .slice(1, pts.length - 1)
-        .map(p => `${p.lat},${p.lon}`)
-        .join("|");
-
-    let url = "https://www.google.com/maps/dir/?api=1"
-            + "&travelmode=driving"
-            + `&origin=${origin}`
-            + `&destination=${destination}`;
-
-    if (waypoints.length > 0) {
-        url += `&waypoints=${waypoints}`;
-    }
+    const url =
+        "https://ayhanartar.github.io/Bauproben/Finale121_tournavigation.html?day="
+        + day;
 
     document.getElementById("qrImage").src =
         "https://api.qrserver.com/v1/create-qr-code/?size=350x350&data=" +
         encodeURIComponent(url);
 
     document.getElementById("qrTitle").textContent =
-        "Navigation – " + day.toUpperCase();
+        "Tour – " + day.toUpperCase();
+
     document.getElementById("qrBox").style.display = "block";
 }
-
-/* ---------------------------------------------------------
-   Tabelle
 --------------------------------------------------------- */
 
 function hexToRgba(hex, alpha) {
