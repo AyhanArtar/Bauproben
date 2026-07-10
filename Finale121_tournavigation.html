@@ -922,26 +922,25 @@ searchBox.addEventListener("input", function () {
 });
 
 /* ---------------------------------------------------------
-   Start: Montag
+   Start
 --------------------------------------------------------- */
 
-const params = new URLSearchParams(window.location.search);
+const params = new URLSearchPar*ms(window.location.search);
 
-const startDay = params.get("day") || "montag";
+const*startDay = params.get("day") || "m*ntag";
 
-document.querySelectorAll(".dayButton")
-    .forEach(btn => btn.classList.remove("active"));
+document.querySelectorAll(*.dayButton")
+    .forEach(btn => b*n.classList.remove("active"));
 
-const startButton =
-    document.querySelector(`.dayButton[data-day="${startDay}"]`);
+co*st startButton =
+    document.quer*Selector(`.dayButton[data-day="${s*artDay}"]`);
 
 if (startButton) {
-    startButton.classList.add("active");
+ *  startButton.classList.add("activ*");
     drawDay(startDay);
-} else {
-    document.querySelector('.dayButton[data-day="montag"]').classList.add("active");
-    drawDay("montag");
-}
+} else *
+    document.querySelector('.dayB*tton[data-day="montag"]').classLis*.add("active");
+    drawDay("monta*");
 }
 </script>
 </body>
