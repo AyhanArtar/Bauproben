@@ -942,8 +942,23 @@ searchBox.addEventListener("input", function () {
    Start: Montag
 --------------------------------------------------------- */
 
-document.querySelector('.dayButton[data-day="montag"]').classList.add("active");
-drawDay("montag");
+const params = new URLSearchParams(window.location.search);
+
+const startDay = params.get("day") || "montag";
+
+document.querySelectorAll(".dayButton")
+    .forEach(btn => btn.classList.remove("active"));
+
+const startButton =
+    document.querySelector(`.dayButton[data-day="${startDay}"]`);
+
+if (startButton) {
+    startButton.classList.add("active");
+    drawDay(startDay);
+} else {
+    document.querySelector('.dayButton[data-day="montag"]').classList.add("active");
+    drawDay("montag");
+}
 </script>
 </body>
 </html>
